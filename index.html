@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>교실 공기질 대시보드</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --card-bg: rgba(255, 255, 255, 0.93);
+      --text-main: #1f2937;
+      --text-sub: #64748b;
+      --shadow: rgba(0, 0, 0, 0.14);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      color: var(--text-main);
+      overflow-x: hidden;
+      transition: background 0.8s ease, color 0.8s ease;
+    }
+
+    body.day-theme {
+      background:
+        radial-gradient(circle at 85% 12%, rgba(250, 204, 21, 0.55) 0, transparent 120px),
+        linear-gradient(135deg, #bfdbfe 0%, #eff6ff 45%, #fff7ed 100%);
+      --card-bg: rgba(255, 255, 255, 0.93);
+      --text-main: #1f2937;
+      --text-sub: #64748b;
+      --shadow: rgba(0, 0, 0, 0.14);
+    }
+
+    body.night-theme {
+      background:
+        radial-gradient(circle at 82% 14%, rgba(255, 255, 255, 0.28) 0, transparent 95px),
+        radial-gradient(circle at top, #1e3a8a 0%, #0f172a 45%, #020617 100%);
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --text-main: #f8fafc;
+      --text-sub: #cbd5e1;
+      --shadow: rgba(0, 0, 0, 0.45);
+    }
+
+    .sky-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .sun {
+      position: absolute;
+      top: 60px;
+      right: 90px;
+      width: 95px;
+      height: 95px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fef3c7 0%, #facc15 55%, #fb923c 100%);
+      box-shadow: 0 0 45px rgba(250, 204, 21, 0.85);
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    .moon {
+      position: absolute;
+      top: 65px;
+      right: 100px;
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      background: #f8fafc;
+      box-shadow: 0 0 38px rgba(248, 250, 252, 0.95);
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    .moon::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      left: 25px;
+      width: 75px;
+      height: 75px;
+      border-radius: 50%;
+      background: #0f172a;
+    }
+
+    body.day-theme .sun {
+      opacity: 1;
+    }
+
+    body.night-theme .moon {
+      opacity: 1;
+    }
+
+    .star {
+      position: absolute;
+      background: #ffffff;
+      border-radius: 50%;
+      opacity: 0;
+      animation: twinkle 2s infinite alternate;
+    }
+
+    body.night-theme .star {
+      opacity: 1;
+    }
+
+    body.day-theme .star {
+      opacity: 0;
+    }
+
+    @keyframes twinkle {
+      from {
+        opacity: 0.25;
+        transform: scale(0.8);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1.4);
+      }
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    header p {
+      margin: 8px 0 0;
+      color: var(--text-sub);
+      font-size: 15px;
+    }
+
+    .theme-badge {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.16);
+      color: var(--text-main);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 520px 430px;
+      justify-content: center;
+      align-items: start;
+      gap: 24px;
+    }
+
+    .classroom-card,
+    .panel {
+      background: var(--card-bg);
+      color: var(--text-main);
+      border-radius: 18px;
+      box-shadow: 0 8px 24px var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .classroom-card {
+      padding: 20px;
+    }
+
+    .panel {
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 22px;
+    }
+
+    .panel h3 {
+      margin: 16px 0 8px;
+      font-size: 18px;
+    }
+
+    svg {
+      width: 470px;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      background: #2563eb;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    .secondary-btn {
+      background: #475569;
+    }
+
+    .green-btn {
+      background: #16a34a;
+    }
+
+    .orange-btn {
+      background: #f97316;
+    }
+
+    .info-box {
+      background: rgba(248, 250, 252, 0.9);
+      color: #1f2937;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      line-height: 1.55;
+    }
+
+    body.night-theme .info-box {
+      background: rgba(30, 41, 59, 0.9);
+      color: #f8fafc;
+      border-color: rgba(71, 85, 105, 0.9);
+    }
+
+    .info-label {
+      display: block;
+      margin-bottom: 6px;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    body.night-theme .info-label {
+      color: #cbd5e1;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .summary-card {
+      border-radius: 14px;
+      padding: 14px;
+      color: white;
+    }
+
+    .summary-card h3,
+    .summary-card p {
+      margin: 4px 0;
+    }
+
+    .good {
+      background: #16a34a;
+    }
+
+    .normal {
+      background: #2563eb;
+    }
+
+    .bad {
+      background: #f97316;
+    }
+
+    .very-bad {
+      background: #dc2626;
+    }
+
+    .grade-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+
+    .record-card {
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: rgba(241, 245, 249, 0.92);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      color: #1f2937;
+      line-height: 1.55;
+    }
+
+    body.night-theme .record-card {
+      background: rgba(30, 41, 59, 0.92);
+      border-color: rgba(71, 85, 105, 0.9);
+      color: #f8fafc;
+    }
+
+    .record-card strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .memo {
+      margin-top: 8px;
+      padding: 8px;
+      border-left: 4px solid #2563eb;
+      background: rgba(37, 99, 235, 0.08);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .warning-box {
+      margin-top: 8px;
+      padding: 9px;
+      border-radius: 10px;
+      color: white;
+      font-size: 13px;
+      font-weight: bold;
+      line-height: 1.45;
+    }
+
+    .solution-box {
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    body.night-theme .solution-box {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.45);
+    }
+
+    .solution-box ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+    }
+
+    .student-seat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    input:disabled {
+      background: #e5e7eb;
+      cursor: not-allowed;
+    }
+
+    input:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+    }
+
+    .student-list {
+      margin-top: 10px;
+      padding-left: 18px;
+      line-height: 1.7;
+      color: var(--text-sub);
+      font-size: 14px;
+    }
+
+    .guide {
+      margin-top: 12px;
+      color: var(--text-sub);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* SVG 교실 디자인 */
+    .classroom-border {
+      fill: none;
+      stroke: #000;
+      stroke-width: 4;
+    }
+
+    .desk {
+      fill: url(#woodPattern);
+      stroke: #000;
+      stroke-width: 4;
+    }
+
+    .desk.selected {
+      stroke: #2563eb;
+      stroke-width: 6;
+      filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.8));
+    }
+
+    .desk-line {
+      stroke: rgba(80, 45, 20, 0.85);
+      stroke-width: 2;
+    }
+
+    .desk-text {
+      fill: rgba(255, 255, 255, 0.95);
+      font-size: 20px;
+      font-weight: bold;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .attached-white {
+      fill: #fff;
+      stroke: #000;
+      stroke-width: 4;
+    }
+
+    .window {
+      fill: url(#windowGradient);
+      stroke: #008fd3;
+      stroke-width: 2;
+    }
+
+    .window.open {
+      stroke: #00c853;
+      stroke-width: 4;
+      filter: drop-shadow(0 0 6px rgba(0, 200, 83, 0.8));
+    }
+
+    .door {
+      fill: url(#doorWood);
+      stroke: #5b3519;
+      stroke-width: 2;
+    }
+
+    .door-line {
+      stroke: rgba(60, 30, 10, 0.7);
+      stroke-width: 1.4;
+    }
+
+    .aircon {
+      fill: rgba(255, 255, 255, 0.35);
+      stroke: #ff1f2d;
+      stroke-width: 4;
+    }
+
+    .aircon.on {
+      fill: rgba(255, 31, 45, 0.13);
+      filter: drop-shadow(0 0 8px rgba(255, 31, 45, 0.8));
+    }
+
+    .aircon-text {
+      fill: #ff1f2d;
+      font-size: 17px;
+      font-weight: bold;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .clickable {
+      cursor: pointer;
+    }
+
+    .clickable:hover {
+      opacity: 0.78;
+    }
+
+    .zone-line {
+      stroke: rgba(37, 99, 235, 0.35);
+      stroke-width: 3;
+      stroke-dasharray: 8 7;
+    }
+
+    .zone-label {
+      fill: #111827;
+      font-size: 17px;
+      font-weight: bold;
+      text-anchor: middle;
+      pointer-events: none;
+    }
+
+    .zone-left-bg {
+      fill: rgba(37, 99, 235, 0.08);
+      cursor: pointer;
+    }
+
+    .zone-right-bg {
+      fill: rgba(249, 115, 22, 0.08);
+      cursor: pointer;
+    }
+
+    .zone-left-bg:hover {
+      fill: rgba(37, 99, 235, 0.16);
+    }
+
+    .zone-right-bg:hover {
+      fill: rgba(249, 115, 22, 0.16);
+    }
+
+    .zone-button {
+      cursor: pointer;
+    }
+
+    .zone-button rect {
+      rx: 12;
+      stroke: rgba(0, 0, 0, 0.25);
+      stroke-width: 1;
+    }
+
+    .zone-button text {
+      fill: #ffffff;
+      font-size: 13px;
+      font-weight: bold;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    @media (max-width: 980px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .classroom-card,
+      .side-column {
+        width: 100%;
+        max-width: 540px;
+        margin: 0 auto;
+      }
+
+      .sun,
+      .moon {
+        top: 36px;
+        right: 28px;
+      }
+    }
+  </style>
+</head>
+
+<body class="day-theme">
+  <div class="sky-bg">
+    <div class="sun"></div>
+    <div class="moon"></div>
+    <div id="stars"></div>
+  </div>
+
+  <div class="app">
+    <header>
+      <h1>교실 공기질 대시보드</h1>
+      <p>교실을 왼쪽/오른쪽 구역으로 나누어 공기질 기록, 색상 경고, 개선 방안을 확인합니다.</p>
+      <div class="theme-badge" id="themeBadge">현재 시간 확인 중...</div>
+    </header>
+
+    <main class="dashboard">
+      <section class="classroom-card">
+        <svg viewBox="0 0 470 630" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="woodPattern" patternUnits="userSpaceOnUse" width="90" height="40">
+              <rect width="90" height="40" fill="#c98b4a" />
+              <path d="M0 8 C20 2, 35 14, 55 8 S80 5, 90 12"
+                fill="none" stroke="#8b4f22" stroke-width="1.4" opacity="0.65" />
+              <path d="M0 22 C18 18, 35 28, 54 22 S78 18, 90 25"
+                fill="none" stroke="#9a5b2c" stroke-width="1.2" opacity="0.6" />
+              <path d="M0 34 C25 26, 45 38, 70 31 S84 30, 90 33"
+                fill="none" stroke="#7a431e" stroke-width="1.1" opacity="0.55" />
+            </pattern>
+
+            <linearGradient id="doorWood" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#7a451f" />
+              <stop offset="45%" stop-color="#b7793d" />
+              <stop offset="100%" stop-color="#6b3a18" />
+            </linearGradient>
+
+            <linearGradient id="windowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#c8f2ff" />
+              <stop offset="50%" stop-color="#3fc3f4" />
+              <stop offset="100%" stop-color="#007fc4" />
+            </linearGradient>
+          </defs>
+
+          <!-- 교실 외곽 -->
+          <rect class="classroom-border" x="24" y="16" width="428" height="600" />
+
+          <!-- 왼쪽/오른쪽 구역 클릭 영역 -->
+          <rect class="zone-left-bg" x="26" y="18" width="210" height="596" onclick="selectZone('left')" />
+          <rect class="zone-right-bg" x="236" y="18" width="214" height="596" onclick="selectZone('right')" />
+
+          <!-- 구역선 -->
+          <line class="zone-line" x1="236" y1="30" x2="236" y2="602" />
+          <text class="zone-label" x="130" y="38">왼쪽 구역</text>
+          <text class="zone-label" x="345" y="38">오른쪽 구역</text>
+
+          <!-- 구역 선택 버튼 -->
+          <g class="zone-button" onclick="selectZone('left')">
+            <rect x="68" y="580" width="130" height="28" fill="#2563eb" />
+            <text x="133" y="594">왼쪽 공기질 보기</text>
+          </g>
+
+          <g class="zone-button" onclick="selectZone('right')">
+            <rect x="270" y="580" width="140" height="28" fill="#f97316" />
+            <text x="340" y="594">오른쪽 공기질 보기</text>
+          </g>
+
+          <!-- 문 -->
+          <g class="clickable" onclick="selectDoor()">
+            <rect class="door" x="13" y="38" width="7" height="120" />
+            <line class="door-line" x1="16.5" y1="45" x2="16.5" y2="150" />
+          </g>
+
+          <!-- 창문 -->
+          <g class="clickable" onclick="toggleWindow('window1', '창문 1')">
+            <rect id="window1" class="window" x="445" y="112" width="7" height="94" />
+          </g>
+          <g class="clickable" onclick="toggleWindow('window2', '창문 2')">
+            <rect id="window2" class="window" x="448" y="277" width="7" height="79" />
+          </g>
+          <g class="clickable" onclick="toggleWindow('window3', '창문 3')">
+            <rect id="window3" class="window" x="448" y="425" width="7" height="91" />
+          </g>
+
+          <!-- 책상 1 -->
+          <g class="clickable" onclick="selectDesk(1)">
+            <rect id="deskRect1" class="desk" x="70" y="53" width="145" height="97" />
+            <line class="desk-line" x1="142.5" y1="53" x2="142.5" y2="150" />
+            <line class="desk-line" x1="70" y1="101.5" x2="215" y2="101.5" />
+            <text class="desk-text" x="142.5" y="101.5">1</text>
+          </g>
+
+          <!-- 책상 2 -->
+          <g class="clickable" onclick="selectDesk(2)">
+            <rect id="deskRect2" class="desk" x="258" y="51" width="152" height="96" />
+            <line class="desk-line" x1="334" y1="51" x2="334" y2="147" />
+            <line class="desk-line" x1="258" y1="99" x2="410" y2="99" />
+            <text class="desk-text" x="334" y="99">2</text>
+          </g>
+
+          <!-- 에어컨 1 -->
+          <g class="clickable" onclick="toggleAircon('aircon1', '에어컨 1')">
+            <rect id="aircon1" class="aircon" x="279" y="116" width="114" height="109" />
+            <text class="aircon-text" x="336" y="171">A/C</text>
+          </g>
+
+          <!-- 책상 3 -->
+          <g class="clickable" onclick="selectDesk(3)">
+            <rect id="deskRect3" class="desk" x="65" y="193" width="153" height="101" />
+            <line class="desk-line" x1="141.5" y1="193" x2="141.5" y2="294" />
+            <line class="desk-line" x1="65" y1="243.5" x2="218" y2="243.5" />
+            <text class="desk-text" x="141.5" y="243.5">3</text>
+          </g>
+
+          <!-- 책상 4 -->
+          <g class="clickable" onclick="selectDesk(4)">
+            <rect id="deskRect4" class="desk" x="259" y="197" width="153" height="95" />
+            <line class="desk-line" x1="335.5" y1="197" x2="335.5" y2="292" />
+            <line class="desk-line" x1="259" y1="244.5" x2="412" y2="244.5" />
+            <text class="desk-text" x="335.5" y="244.5">4</text>
+          </g>
+
+          <!-- 붙은 작은 사각형 -->
+          <rect class="attached-white" x="43" y="370" width="26" height="50" />
+
+          <!-- 책상 5 -->
+          <g class="clickable" onclick="selectDesk(5)">
+            <rect id="deskRect5" class="desk" x="68" y="340" width="145" height="100" />
+            <line class="desk-line" x1="140.5" y1="340" x2="140.5" y2="440" />
+            <line class="desk-line" x1="68" y1="390" x2="213" y2="390" />
+            <text class="desk-text" x="140.5" y="390">5</text>
+          </g>
+
+          <!-- 책상 6 -->
+          <g class="clickable" onclick="selectDesk(6)">
+            <rect id="deskRect6" class="desk" x="254" y="343" width="153" height="96" />
+            <line class="desk-line" x1="330.5" y1="343" x2="330.5" y2="439" />
+            <line class="desk-line" x1="254" y1="391" x2="407" y2="391" />
+            <text class="desk-text" x="330.5" y="391">6</text>
+          </g>
+
+          <!-- 에어컨 2 -->
+          <g class="clickable" onclick="toggleAircon('aircon2', '에어컨 2')">
+            <rect id="aircon2" class="aircon" x="275" y="411" width="103" height="97" />
+            <text class="aircon-text" x="326.5" y="459.5">A/C</text>
+          </g>
+
+          <!-- 책상 7 -->
+          <g class="clickable" onclick="selectDesk(7)">
+            <rect id="deskRect7" class="desk" x="252" y="470" width="152" height="96" />
+            <line class="desk-line" x1="328" y1="470" x2="328" y2="566" />
+            <line class="desk-line" x1="252" y1="518" x2="404" y2="518" />
+            <text class="desk-text" x="328" y="518">7</text>
+          </g>
+        </svg>
+      </section>
+
+      <section class="side-column">
+        <aside class="panel">
+          <h2>선택 정보</h2>
+
+          <div class="info-box">
+            <span class="info-label">종류</span>
+            <strong id="infoType">안내</strong>
+          </div>
+
+          <div class="info-box">
+            <span class="info-label">이름</span>
+            <strong id="infoName">교실 공기질 대시보드</strong>
+          </div>
+
+          <div class="info-box">
+            <span class="info-label">상태</span>
+            <p id="infoStatus">왼쪽 구역 또는 오른쪽 구역을 클릭하면 공기질 기록, 색상 경고, 개선 방안이 표시됩니다.</p>
+          </div>
+        </aside>
+
+        <aside class="panel">
+          <h2>공기질 구역 선택</h2>
+
+          <div class="button-row">
+            <button onclick="selectZone('left')">왼쪽 구역 보기</button>
+            <button class="orange-btn" onclick="selectZone('right')">오른쪽 구역 보기</button>
+            <button class="green-btn" onclick="showComparison()">왼쪽/오른쪽 비교</button>
+          </div>
+
+          <div class="summary-grid">
+            <div id="leftSummary" class="summary-card good">
+              <h3>왼쪽 평균</h3>
+              <p id="leftGrade">등급: -</p>
+              <p id="leftValue">PM2.5: - / CO₂: -</p>
+            </div>
+
+            <div id="rightSummary" class="summary-card good">
+              <h3>오른쪽 평균</h3>
+              <p id="rightGrade">등급: -</p>
+              <p id="rightValue">PM2.5: - / CO₂: -</p>
+            </div>
+          </div>
+
+          <div id="comparisonBox" class="info-box">
+            <span class="info-label">비교 결과</span>
+            왼쪽/오른쪽 비교 버튼을 누르면 평균 공기질 비교 결과가 표시됩니다.
+          </div>
+        </aside>
+
+        <aside class="panel">
+          <h2 id="zoneTitle">공기질 기록</h2>
+
+          <div id="zoneResult">
+            <div class="info-box">
+              왼쪽 또는 오른쪽 구역을 선택해주세요.
+            </div>
+          </div>
+        </aside>
+
+        <aside class="panel">
+          <h2>공기질 개선 방안</h2>
+
+          <div id="solutionResult" class="info-box">
+            구역을 선택하면 해당 구역의 평균 공기질을 기준으로 개선 방안이 표시됩니다.
+          </div>
+        </aside>
+
+        <aside class="panel">
+          <h2>학생 자리 이름 기록</h2>
+
+          <div class="info-box">
+            <span class="info-label">선택한 책상</span>
+            <strong id="selectedDeskTitle">아직 선택하지 않음</strong>
+          </div>
+
+          <div class="student-seat-grid">
+            <div>
+              <label for="seatName1">1번 자리</label>
+              <input id="seatName1" type="text" placeholder="학생 이름" disabled />
+            </div>
+
+            <div>
+              <label for="seatName2">2번 자리</label>
+              <input id="seatName2" type="text" placeholder="학생 이름" disabled />
+            </div>
+
+            <div>
+              <label for="seatName3">3번 자리</label>
+              <input id="seatName3" type="text" placeholder="학생 이름" disabled />
+            </div>
+
+            <div>
+              <label for="seatName4">4번 자리</label>
+              <input id="seatName4" type="text" placeholder="학생 이름" disabled />
+            </div>
+          </div>
+
+          <div class="button-row" style="margin-top: 12px;">
+            <button class="green-btn" onclick="saveStudentNames()">학생 이름 저장</button>
+            <button class="secondary-btn" onclick="clearSelectedDeskNames()">선택 책상 이름 지우기</button>
+          </div>
+
+          <ul id="studentList" class="student-list">
+            <li>책상을 선택하면 저장된 학생 이름이 표시됩니다.</li>
+          </ul>
+        </aside>
+
+        <aside class="panel">
+          <h2>배경 테스트</h2>
+
+          <div class="button-row">
+            <button class="secondary-btn" onclick="setTheme('day')">낮 배경 테스트</button>
+            <button class="secondary-btn" onclick="setTheme('night')">밤 배경 테스트</button>
+            <button class="secondary-btn" onclick="applyTimeTheme()">현재 시간 배경</button>
+          </div>
+
+          <p class="guide">
+            실제 시간 기준으로 오전/낮에는 밝은 배경, 밤에는 달과 별 배경이 적용됩니다.
+          </p>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    /*
+      여기에 실제 측정한 공기질 데이터를 넣으면 됩니다.
+
+      zone:
+      - "left"  = 왼쪽 구역
+      - "right" = 오른쪽 구역
+
+      pm25:
+      - PM2.5 미세먼지 값, 단위 ㎍/㎥
+
+      co2:
+      - 이산화탄소 값, 단위 ppm
+
+      memo:
+      - 측정 상황 메모
+    */
+    const AIR_QUALITY_RECORDS = [
+      {
+        zone: "left",
+        time: "2026-07-23 09:10:00",
+        pm25: 14,
+        co2: 760,
+        memo: "아침 조회 전 측정. 창문 일부 열림."
+      },
+      {
+        zone: "right",
+        time: "2026-07-23 09:12:00",
+        pm25: 20,
+        co2: 870,
+        memo: "오른쪽 창문은 닫힌 상태."
+      },
+      {
+        zone: "left",
+        time: "2026-07-23 12:40:00",
+        pm25: 23,
+        co2: 980,
+        memo: "점심시간 직후 측정. 학생 이동이 많았음."
+      },
+      {
+        zone: "right",
+        time: "2026-07-23 12:42:00",
+        pm25: 31,
+        co2: 1120,
+        memo: "점심시간 직후 측정. 오른쪽 구역에 사람이 많았음."
+      },
+      {
+        zone: "left",
+        time: "2026-07-23 15:20:00",
+        pm25: 18,
+        co2: 820,
+        memo: "수업 중간 측정. 에어컨 작동 중."
+      },
+      {
+        zone: "right",
+        time: "2026-07-23 15:22:00",
+        pm25: 27,
+        co2: 1040,
+        memo: "수업 중간 측정. 창문 닫힘."
+      }
+    ];
+
+    const airconState = {
+      aircon1: false,
+      aircon2: false
+    };
+
+    const windowState = {
+      window1: false,
+      window2: false,
+      window3: false
+    };
+
+    let selectedDesk = null;
+    let studentNames = {};
+
+    function createStars() {
+      const starsBox = document.getElementById("stars");
+      starsBox.innerHTML = "";
+
+      for (let i = 0; i < 80; i++) {
+        const star = document.createElement("div");
+        star.className = "star";
+
+        const size = Math.random() * 3 + 1;
+        star.style.left = Math.random() * 100 + "vw";
+        star.style.top = Math.random() * 80 + "vh";
+        star.style.width = size + "px";
+        star.style.height = size + "px";
+        star.style.animationDelay = Math.random() * 2 + "s";
+
+        starsBox.appendChild(star);
+      }
+    }
+
+    function setTheme(mode) {
+      document.body.classList.remove("day-theme", "night-theme");
+
+      if (mode === "night") {
+        document.body.classList.add("night-theme");
+        document.getElementById("themeBadge").textContent = "테스트 모드: 밤 배경, 달과 별 표시";
+      } else {
+        document.body.classList.add("day-theme");
+        document.getElementById("themeBadge").textContent = "테스트 모드: 낮 배경";
+      }
+    }
+
+    function applyTimeTheme() {
+      const now = new Date();
+      const hour = now.getHours();
+      const timeText = getCurrentTimeText();
+
+      document.body.classList.remove("day-theme", "night-theme");
+
+      if (hour >= 6 && hour < 18) {
+        document.body.classList.add("day-theme");
+
+        if (hour < 12) {
+          document.getElementById("themeBadge").textContent =
+            `현재 시간: ${timeText} · 오전 밝은 배경`;
+        } else {
+          document.getElementById("themeBadge").textContent =
+            `현재 시간: ${timeText} · 낮 밝은 배경`;
+        }
+      } else {
+        document.body.classList.add("night-theme");
+        document.getElementById("themeBadge").textContent =
+          `현재 시간: ${timeText} · 밤 배경, 달과 별 표시`;
+      }
+    }
+
+    function getCurrentTimeText() {
+      const now = new Date();
+
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const date = String(now.getDate()).padStart(2, "0");
+      const hour = String(now.getHours()).padStart(2, "0");
+      const minute = String(now.getMinutes()).padStart(2, "0");
+      const second = String(now.getSeconds()).padStart(2, "0");
+
+      return `${year}-${month}-${date} ${hour}:${minute}:${second}`;
+    }
+
+    function updateInfo(type, name, status) {
+      document.getElementById("infoType").textContent = type;
+      document.getElementById("infoName").textContent = name;
+      document.getElementById("infoStatus").textContent = status;
+    }
+
+    function getAirGrade(pm25, co2) {
+      if (pm25 <= 15 && co2 <= 800) {
+        return {
+          text: "좋음",
+          className: "good",
+          score: 1,
+          warning: "좋음: 공기질이 안정적인 상태입니다."
+        };
+      }
+
+      if (pm25 <= 35 && co2 <= 1000) {
+        return {
+          text: "보통",
+          className: "normal",
+          score: 2,
+          warning: "보통: 생활에는 큰 문제가 없지만 환기 상태를 확인하면 좋습니다."
+        };
+      }
+
+      if (pm25 <= 75 && co2 <= 1500) {
+        return {
+          text: "나쁨",
+          className: "bad",
+          score: 3,
+          warning: "나쁨: 환기 또는 공기질 관리가 필요한 상태입니다."
+        };
+      }
+
+      return {
+        text: "매우 나쁨",
+        className: "very-bad",
+        score: 4,
+        warning: "매우 나쁨: 즉시 환기하거나 공기질 개선 조치가 필요합니다."
+      };
+    }
+
+    function getImprovementSuggestions(pm25, co2) {
+      const suggestions = [];
+
+      if (co2 > 1500) {
+        suggestions.push("CO₂ 농도가 매우 높습니다. 쉬는 시간에 문과 창문을 열어 5~10분 이상 강하게 환기하는 것이 좋습니다.");
+      } else if (co2 > 1000) {
+        suggestions.push("CO₂ 농도가 다소 높습니다. 수업 중간이나 쉬는 시간에 짧게라도 환기하는 것이 좋습니다.");
+      } else if (co2 > 800) {
+        suggestions.push("CO₂가 조금 올라가고 있습니다. 사람이 많은 시간에는 환기 상태를 확인해보세요.");
+      }
+
+      if (pm25 > 75) {
+        suggestions.push("PM2.5가 매우 높습니다. 실외 미세먼지가 나쁜 날에는 창문을 오래 열기보다 공기청정기 사용이나 먼지 발생 원인 확인이 필요합니다.");
+      } else if (pm25 > 35) {
+        suggestions.push("PM2.5가 높은 편입니다. 바닥 먼지, 칠판가루, 종이먼지 등을 줄이고 주변 정리를 하는 것이 좋습니다.");
+      } else if (pm25 > 15) {
+        suggestions.push("PM2.5가 보통 수준입니다. 청소 상태와 창문 개방 상태를 함께 확인하면 좋습니다.");
+      }
+
+      if (pm25 <= 15 && co2 <= 800) {
+        suggestions.push("현재 공기질이 좋은 편입니다. 지금처럼 주기적인 환기와 청결 상태를 유지하면 좋습니다.");
+      }
+
+      return suggestions;
+    }
+
+    function getZoneName(zone) {
+      if (zone === "left") {
+        return "왼쪽 구역";
+      }
+
+      return "오른쪽 구역";
+    }
+
+    function getZoneRecords(zone) {
+      return AIR_QUALITY_RECORDS.filter(record => record.zone === zone);
+    }
+
+    function getZoneAverage(zone) {
+      const records = getZoneRecords(zone);
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      const pm25Average = Math.round(
+        records.reduce((sum, record) => sum + record.pm25, 0) / records.length
+      );
+
+      const co2Average = Math.round(
+        records.reduce((sum, record) => sum + record.co2, 0) / records.length
+      );
+
+      const grade = getAirGrade(pm25Average, co2Average);
+
+      return {
+        count: records.length,
+        pm25: pm25Average,
+        co2: co2Average,
+        gradeText: grade.text,
+        gradeClass: grade.className,
+        warning: grade.warning,
+        score: pm25Average + co2Average / 40
+      };
+    }
+
+    function renderSuggestions(pm25, co2) {
+      const suggestions = getImprovementSuggestions(pm25, co2);
+
+      let html = `
+        <div class="solution-box">
+          <strong>공기질 개선 방안</strong>
+          <ul>
+      `;
+
+      suggestions.forEach(item => {
+        html += `<li>${item}</li>`;
+      });
+
+      html += `
+          </ul>
+        </div>
+      `;
+
+      return html;
+    }
+
+    function selectZone(zone) {
+      clearDeskSelectionVisual();
+
+      const zoneName = getZoneName(zone);
+      const records = getZoneRecords(zone);
+      const average = getZoneAverage(zone);
+
+      document.getElementById("zoneTitle").textContent = `${zoneName} 공기질 기록`;
+
+      if (records.length === 0 || average === null) {
+        document.getElementById("zoneResult").innerHTML = `
+          <div class="info-box">
+            ${zoneName}에 저장된 공기질 기록이 없습니다.
+          </div>
+        `;
+
+        document.getElementById("solutionResult").innerHTML = `
+          ${zoneName}에 저장된 공기질 기록이 없어 개선 방안을 표시할 수 없습니다.
+        `;
+
+        updateInfo(
+          "공기질",
+          zoneName,
+          "아직 저장된 공기질 기록이 없습니다."
+        );
+
+        return;
+      }
+
+      let html = "";
+
+      html += `
+        <div class="summary-card ${average.gradeClass}" style="margin-bottom: 12px;">
+          <h3>${zoneName} 평균</h3>
+          <p>기록 개수: ${average.count}개</p>
+          <p>PM2.5 평균: ${average.pm25}㎍/㎥</p>
+          <p>CO₂ 평균: ${average.co2}ppm</p>
+          <p>평균 등급: ${average.gradeText}</p>
+        </div>
+
+        <div class="warning-box ${average.gradeClass}">
+          색상 경고: ${average.warning}
+        </div>
+
+        ${renderSuggestions(average.pm25, average.co2)}
+      `;
+
+      records.forEach(record => {
+        const grade = getAirGrade(record.pm25, record.co2);
+
+        html += `
+          <div class="record-card">
+            <strong>${record.time}</strong>
+            PM2.5: ${record.pm25}㎍/㎥<br>
+            CO₂: ${record.co2}ppm<br>
+            등급:
+            <span class="grade-badge ${grade.className}">${grade.text}</span>
+
+            <div class="warning-box ${grade.className}">
+              색상 경고: ${grade.warning}
+            </div>
+
+            <div class="memo">
+              메모: ${record.memo ? record.memo : "메모 없음"}
+            </div>
+
+            ${renderSuggestions(record.pm25, record.co2)}
+          </div>
+        `;
+      });
+
+      document.getElementById("zoneResult").innerHTML = html;
+
+      document.getElementById("solutionResult").innerHTML = `
+        <span class="info-label">${zoneName} 평균 기준</span>
+        <strong>${zoneName}의 평균 공기질 개선 방안</strong>
+        ${renderSuggestions(average.pm25, average.co2)}
+      `;
+
+      updateInfo(
+        "공기질",
+        zoneName,
+        `${zoneName}의 평균은 PM2.5 ${average.pm25}㎍/㎥, CO₂ ${average.co2}ppm이며 등급은 '${average.gradeText}'입니다.`
+      );
+    }
+
+    function updateAverageCards() {
+      const left = getZoneAverage("left");
+      const right = getZoneAverage("right");
+
+      if (left) {
+        document.getElementById("leftSummary").className = `summary-card ${left.gradeClass}`;
+        document.getElementById("leftGrade").textContent = `등급: ${left.gradeText}`;
+        document.getElementById("leftValue").textContent =
+          `PM2.5: ${left.pm25}㎍/㎥ / CO₂: ${left.co2}ppm`;
+      }
+
+      if (right) {
+        document.getElementById("rightSummary").className = `summary-card ${right.gradeClass}`;
+        document.getElementById("rightGrade").textContent = `등급: ${right.gradeText}`;
+        document.getElementById("rightValue").textContent =
+          `PM2.5: ${right.pm25}㎍/㎥ / CO₂: ${right.co2}ppm`;
+      }
+    }
+
+    function showComparison() {
+      const left = getZoneAverage("left");
+      const right = getZoneAverage("right");
+
+      if (!left || !right) {
+        document.getElementById("comparisonBox").innerHTML = `
+          <span class="info-label">비교 결과</span>
+          왼쪽과 오른쪽 데이터가 모두 있어야 비교할 수 있습니다.
+        `;
+        return;
+      }
+
+      let result = "";
+      let explanation = "";
+      let targetZone = null;
+
+      if (Math.abs(left.score - right.score) < 3) {
+        result = "왼쪽과 오른쪽이 비슷함";
+        explanation = "두 구역의 평균 PM2.5와 CO₂ 차이가 크지 않습니다.";
+      } else if (left.score < right.score) {
+        result = "왼쪽 구역의 공기질이 더 좋음";
+        explanation = "오른쪽 구역의 평균 오염도 점수가 왼쪽보다 높습니다.";
+        targetZone = right;
+      } else {
+        result = "오른쪽 구역의 공기질이 더 좋음";
+        explanation = "왼쪽 구역의 평균 오염도 점수가 오른쪽보다 높습니다.";
+        targetZone = left;
+      }
+
+      let improvementHtml = "";
+
+      if (targetZone) {
+        improvementHtml = `
+          <br>
+          <strong>개선이 더 필요한 구역을 위한 방안</strong>
+          ${renderSuggestions(targetZone.pm25, targetZone.co2)}
+        `;
+      } else {
+        improvementHtml = `
+          <br>
+          <strong>전체 유지 방안</strong>
+          <div class="solution-box">
+            <ul>
+              <li>왼쪽과 오른쪽 모두 주기적으로 환기 상태를 확인합니다.</li>
+              <li>측정 시간대를 아침, 점심 후, 오후로 나누어 비교하면 더 정확한 분석이 가능합니다.</li>
+            </ul>
+          </div>
+        `;
+      }
+
+      document.getElementById("comparisonBox").innerHTML = `
+        <span class="info-label">비교 결과</span>
+        <strong>${result}</strong><br><br>
+
+        왼쪽 평균: PM2.5 ${left.pm25}㎍/㎥ / CO₂ ${left.co2}ppm / ${left.gradeText}<br>
+        오른쪽 평균: PM2.5 ${right.pm25}㎍/㎥ / CO₂ ${right.co2}ppm / ${right.gradeText}<br><br>
+
+        ${explanation}
+        ${improvementHtml}
+      `;
+
+      updateInfo(
+        "공기질 비교",
+        "왼쪽/오른쪽 평균 비교",
+        result
+      );
+    }
+
+    function selectDoor() {
+      clearDeskSelectionVisual();
+
+      updateInfo(
+        "문",
+        "교실 출입문",
+        "나무 문 디자인으로 표시했습니다."
+      );
+    }
+
+    function toggleAircon(id, name) {
+      airconState[id] = !airconState[id];
+      const element = document.getElementById(id);
+
+      if (airconState[id]) {
+        element.classList.add("on");
+        updateInfo("에어컨", name, "현재 ON 상태로 표시했습니다.");
+      } else {
+        element.classList.remove("on");
+        updateInfo("에어컨", name, "현재 OFF 상태로 표시했습니다.");
+      }
+    }
+
+    function toggleWindow(id, name) {
+      windowState[id] = !windowState[id];
+      const element = document.getElementById(id);
+
+      if (windowState[id]) {
+        element.classList.add("open");
+        updateInfo("창문", name, "현재 열림 상태로 표시했습니다.");
+      } else {
+        element.classList.remove("open");
+        updateInfo("창문", name, "현재 닫힘 상태로 표시했습니다.");
+      }
+    }
+
+    function selectDesk(deskNumber) {
+      selectedDesk = deskNumber;
+      clearDeskSelectionVisual();
+
+      const selectedRect = document.getElementById(`deskRect${deskNumber}`);
+      if (selectedRect) {
+        selectedRect.classList.add("selected");
+      }
+
+      document.getElementById("selectedDeskTitle").textContent = `책상 ${deskNumber}`;
+
+      enableSeatInputs(true);
+      loadSelectedDeskNamesToInputs();
+      renderSelectedDeskStudentList();
+
+      updateInfo(
+        "책상",
+        `책상 ${deskNumber}`,
+        "이 책상에 앉는 학생 이름을 입력하고 저장할 수 있습니다."
+      );
+    }
+
+    function clearDeskSelectionVisual() {
+      for (let i = 1; i <= 7; i++) {
+        const rect = document.getElementById(`deskRect${i}`);
+        if (rect) {
+          rect.classList.remove("selected");
+        }
+      }
+    }
+
+    function enableSeatInputs(enabled) {
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById(`seatName${i}`).disabled = !enabled;
+      }
+    }
+
+    function loadSelectedDeskNamesToInputs() {
+      const names = studentNames[selectedDesk] || ["", "", "", ""];
+
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById(`seatName${i}`).value = names[i - 1] || "";
+      }
+    }
+
+    function saveStudentNames() {
+      if (selectedDesk === null) {
+        alert("먼저 책상을 선택해주세요.");
+        return;
+      }
+
+      const names = [];
+
+      for (let i = 1; i <= 4; i++) {
+        names.push(document.getElementById(`seatName${i}`).value.trim());
+      }
+
+      studentNames[selectedDesk] = names;
+      localStorage.setItem("studentNames", JSON.stringify(studentNames));
+
+      renderSelectedDeskStudentList();
+
+      updateInfo(
+        "학생 이름 저장",
+        `책상 ${selectedDesk}`,
+        `책상 ${selectedDesk}의 학생 이름을 저장했습니다.`
+      );
+    }
+
+    function clearSelectedDeskNames() {
+      if (selectedDesk === null) {
+        alert("먼저 책상을 선택해주세요.");
+        return;
+      }
+
+      studentNames[selectedDesk] = ["", "", "", ""];
+      localStorage.setItem("studentNames", JSON.stringify(studentNames));
+
+      loadSelectedDeskNamesToInputs();
+      renderSelectedDeskStudentList();
+
+      updateInfo(
+        "학생 이름 삭제",
+        `책상 ${selectedDesk}`,
+        `책상 ${selectedDesk}의 학생 이름을 지웠습니다.`
+      );
+    }
+
+    function renderSelectedDeskStudentList() {
+      const list = document.getElementById("studentList");
+
+      if (selectedDesk === null) {
+        list.innerHTML = "<li>책상을 선택하면 저장된 학생 이름이 표시됩니다.</li>";
+        return;
+      }
+
+      const names = studentNames[selectedDesk] || ["", "", "", ""];
+      let html = "";
+
+      for (let i = 0; i < 4; i++) {
+        const name = names[i] ? names[i] : "비어 있음";
+        html += `<li>${i + 1}번 자리: ${name}</li>`;
+      }
+
+      list.innerHTML = html;
+    }
+
+    function loadStudentNames() {
+      const saved = localStorage.getItem("studentNames");
+
+      if (saved) {
+        studentNames = JSON.parse(saved);
+      } else {
+        studentNames = {};
+      }
+    }
+
+    window.addEventListener("load", function () {
+      createStars();
+      applyTimeTheme();
+      loadStudentNames();
+      updateAverageCards();
+
+      setInterval(applyTimeTheme, 60000);
+
+      updateInfo(
+        "안내",
+        "교실 공기질 대시보드",
+        "왼쪽 구역 또는 오른쪽 구역을 클릭하면 공기질 기록, 색상 경고, 메모, 개선 방안이 표시됩니다."
+      );
+    });
+  </script>
+</body>
+</html>
